@@ -1,17 +1,21 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelButton from '@/components/PixelButton';
-import PixelStars from '@/components/PixelStars';
 import ScanlineOverlay from '@/components/ScanlineOverlay';
 import { useGameStore } from '@/store/useGameStore';
 import { useAudio } from '@/hooks/useAudio';
-import { Play, Map, BookOpen, Settings as SettingsIcon, Newspaper } from 'lucide-react';
+import { getCharacterById } from '@/data/characters';
+import { getBikeById } from '@/data/bikes';
+import { Play, Map, BookOpen, Settings as SettingsIcon, Newspaper, Shield, Trophy, Zap } from 'lucide-react';
 
 export default function MainMenu() {
   const navigate = useNavigate();
   const loadSave = useGameStore(s => s.loadSave);
   const totalCoins = useGameStore(s => s.saveData.totalCoins);
   const totalDeliveries = useGameStore(s => s.saveData.totalDeliveries);
+  const ps = useGameStore(s => s.saveData.persistentStats);
+  const selectedChar = useGameStore(s => s.saveData.selectedCharacter);
+  const selectedBike = useGameStore(s => s.saveData.selectedBike);
   const { playSfx } = useAudio();
 
   useEffect(() => {
@@ -22,6 +26,9 @@ export default function MainMenu() {
     playSfx('menu');
     navigate(route);
   };
+
+  const charData = getCharacterById(selectedChar);
+  const bikeData = getBikeById(selectedBike);
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-pixel-bg p-4 overflow-hidden relative">
@@ -59,6 +66,29 @@ export default function MainMenu() {
             <div className="mt-4 font-retro text-lg text-pixel-paper/80">
               骑上自行车，穿梭街区投递报纸吧！
             </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mb-6">
+            {charData && (
+              <div className="pixel-border-sm bg-pixel-bg px-3 py-1.5 flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {charData.colors.slice(0, 3).map((c, i) => (
+                    <div key={i} className="w-2 h-2 border border-pixel-paper/30" style={{ background: c }} />
+                  ))}
+                </div>
+                <span className="font-retro text-xs text-pixel-paper">{charData.name}</span>
+              </div>
+            )}
+            {bikeData && (
+              <div className="pixel-border-sm bg-pixel-bg px-3 py-1.5 flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {bikeData.colors.slice(0, 2).map((c, i) => (
+                    <div key={i} className="w-2 h-2 border border-pixel-paper/30" style={{ background: c }} />
+                  ))}
+                </div>
+                <span className="font-retro text-xs text-pixel-paper">{bikeData.name}</span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-lg mx-auto mb-8">
@@ -100,15 +130,28 @@ export default function MainMenu() {
             </PixelButton>
           </div>
 
-          <div className="border-t-4 border-pixel-yellow/30 pt-4 max-w-md mx-auto">
-            <div className="grid grid-cols-2 gap-4 font-retro text-lg text-pixel-paper/90">
+          <div className="border-t-4 border-pixel-yellow/30 pt-4 max-w-lg mx-auto">
+            <div className="grid grid-cols-3 gap-3 font-retro text-lg text-pixel-paper/90">
               <div className="pixel-border-sm bg-pixel-bg p-3 text-center">
-                <div className="text-pixel-gold text-2xl font-pixel text-xs mb-1">总金币</div>
-                <div className="text-pixel-yellow text-2xl tabular-nums">{totalCoins}</div>
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <Newspaper className="w-3 h-3 text-pixel-green" />
+                  <span className="font-pixel text-[8px] text-pixel-green">总投递</span>
+                </div>
+                <div className="text-pixel-green text-xl tabular-nums">{totalDeliveries}</div>
               </div>
               <div className="pixel-border-sm bg-pixel-bg p-3 text-center">
-                <div className="text-pixel-green text-2xl font-pixel text-xs mb-1">总投递</div>
-                <div className="text-pixel-green text-2xl tabular-nums">{totalDeliveries}</div>
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <Zap className="w-3 h-3 text-pixel-gold" />
+                  <span className="font-pixel text-[8px] text-pixel-gold">总金币</span>
+                </div>
+                <div className="text-pixel-yellow text-xl tabular-nums">{totalCoins}</div>
+              </div>
+              <div className="pixel-border-sm bg-pixel-bg p-3 text-center">
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <Shield className="w-3 h-3 text-pixel-blue" />
+                  <span className="font-pixel text-[8px] text-pixel-blue">无伤</span>
+                </div>
+                <div className="text-pixel-blue text-xl tabular-nums">{ps.noDamageCount}</div>
               </div>
             </div>
           </div>

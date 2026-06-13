@@ -25,6 +25,7 @@ export default function ResultScreen() {
   const checkAllUnlocks = useGameStore(s => s.checkAllUnlocks);
   const starProgress = useGameStore(s => s.saveData.starProgress);
   const highScores = useGameStore(s => s.saveData.highScores);
+  const levelHistory = useGameStore(s => s.saveData.levelHistory);
   const prevStars = starProgress[levelId] || 0;
   const prevHigh = highScores[levelId] || 0;
 
@@ -40,11 +41,19 @@ export default function ResultScreen() {
   const livesUsed = (level?.startLives || 3) - useGameStore(s => s.lives);
   const target = level?.targetDeliveries || 0;
 
+  const usedCharacter = useGameStore(s => s.saveData.selectedCharacter);
+  const usedBike = useGameStore(s => s.saveData.selectedBike);
+  const usedPaper = useGameStore(s => s.saveData.selectedPaper);
+
   const [stars, setStars] = useState<0 | 1 | 2 | 3>(0);
   const [newRecord, setNewRecord] = useState(false);
   const [showStars, setShowStars] = useState(false);
   const [newlyUnlocked, setNewlyUnlocked] = useState<{ bikes: string[]; papers: string[]; characters: string[] }>({ bikes: [], papers: [], characters: [] });
   const victory = locState?.victory ?? true;
+
+  const charData = getCharacterById(usedCharacter);
+  const bikeData = getBikeById(usedBike);
+  const paperData = getPaperById(usedPaper);
 
   useEffect(() => {
     if (!level) return;
@@ -106,6 +115,15 @@ export default function ResultScreen() {
                 🌟 新纪录星级! +{stars - prevStars} 星
               </div>
             )}
+          </div>
+
+          <div className="pixel-border-sm bg-pixel-bg p-3 mb-4">
+            <div className="font-pixel text-[9px] text-pixel-paper/60 mb-2 text-center">出战配置</div>
+            <div className="grid grid-cols-3 gap-2">
+              <ConfigItem label="角色" name={charData?.name || '未知'} colors={charData?.colors} />
+              <ConfigItem label="自行车" name={bikeData?.name || '未知'} colors={bikeData ? [bikeData.colors[0], bikeData.colors[2]] : undefined} />
+              <ConfigItem label="报纸" name={paperData?.name || '未知'} colors={paperData ? [paperData.colors[0], paperData.colors[1]] : undefined} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -208,6 +226,24 @@ export default function ResultScreen() {
             </PixelButton>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfigItem({ label, name, colors }: { label: string; name: string; colors?: string[] }) {
+  return (
+    <div className="pixel-border-sm bg-pixel-brown p-2 text-center">
+      <div className="font-pixel text-[8px] text-pixel-paper/60 mb-1">{label}</div>
+      <div className="flex items-center justify-center gap-1.5">
+        {colors && colors.length > 0 && (
+          <div className="flex gap-0.5">
+            {colors.slice(0, 3).map((c, i) => (
+              <div key={i} className="w-2.5 h-2.5 border border-pixel-paper/30" style={{ background: c }} />
+            ))}
+          </div>
+        )}
+        <span className="font-retro text-sm text-pixel-paper">{name}</span>
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ export default function Collection() {
   const selectSkin = useGameStore(s => s.selectSkin);
   const totalCoins = useGameStore(s => s.saveData.totalCoins);
   const totalDeliveries = useGameStore(s => s.saveData.totalDeliveries);
+  const ps = useGameStore(s => s.saveData.persistentStats);
 
   const items = useMemo(() => {
     if (tab === 'bike') return BIKES as AnySkin[];
@@ -80,20 +81,12 @@ export default function Collection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <MiniStat label="解锁自行车" value={`${unlockedBikes.length}/${BIKES.length}`} color="text-pixel-blue" />
           <MiniStat label="解锁报纸" value={`${unlockedPapers.length}/${PAPERS.length}`} color="text-pixel-paper" />
           <MiniStat label="解锁角色" value={`${unlockedCharacters.length}/${CHARACTERS.length}`} color="text-pink-300" />
-          <div className="grid grid-cols-2 col-span-2 md:col-span-1 gap-4 md:hidden">
-            <MiniStat label="累计金币" value={totalCoins.toString()} color="text-pixel-gold" />
-            <MiniStat label="累计投递" value={totalDeliveries.toString()} color="text-pixel-green" />
-          </div>
-          <div className="hidden md:block">
-            <MiniStat label="累计金币" value={totalCoins.toString()} color="text-pixel-gold" />
-          </div>
-          <div className="hidden md:block">
-            <MiniStat label="累计投递" value={totalDeliveries.toString()} color="text-pixel-green" />
-          </div>
+          <MiniStat label="累计金币" value={totalCoins.toString()} color="text-pixel-gold" />
+          <MiniStat label="无伤通关" value={ps.noDamageCount.toString()} color="text-pixel-green" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-6">

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { loadSaveData, saveSaveData, defaultSaveData, SaveData, GameSettings } from '@/utils/storage';
+import { loadSaveData, saveSaveData, defaultSaveData, SaveData, GameSettings, PersistentStats, LevelHistory } from '@/utils/storage';
 import { LEVELS, getLevelById, Level, LevelResult } from '@/data/levels';
 import { BIKES } from '@/data/bikes';
 import { PAPERS } from '@/data/papers';
@@ -25,12 +25,6 @@ interface GameState {
   charging: boolean;
   noDamageRun: boolean;
   papersMissed: number;
-  sessionStats: {
-    deliveriesCount: number;
-    comboMax: number;
-    noDamageCount: number;
-    threeStars: number;
-  };
   loadSave: () => void;
   saveGame: () => void;
   startLevel: (levelId: string) => void;
@@ -54,7 +48,7 @@ interface GameState {
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
-  saveData: { ...defaultSaveData },
+  saveData: { ...defaultSaveData, persistentStats: { ...defaultSaveData.persistentStats }, levelHistory: {} },
   currentLevel: null,
   score: 0,
   combo: 0,
@@ -73,12 +67,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   charging: false,
   noDamageRun: true,
   papersMissed: 0,
-  sessionStats: {
-    deliveriesCount: 0,
-    comboMax: 0,
-    noDamageCount: 0,
-    threeStars: 0,
-  },
 
   loadSave() {
     const data = loadSaveData();
@@ -215,11 +203,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevStars = s.saveData.starProgress[level.id] || 0;
     const prevHigh = s.saveData.highScores[level.id] || 0;
 
-    const sessionStats = { ...s.sessionStats };
-    sessionStats.deliveriesCount += s.deliveries;
-    sessionStats.comboMax = Math.max(sessionStats.comboMax, s.comboMax);
-    if (s.noDamageRun && victory) sessionStats.noDamageCount += 1;
-    if (stars === 3) sessionStats.threeStars += 1;
+    const ps: PersistentStats = { ...s.saveData.persistentStats };
+    ps.deliveriesCount += s.deliveries;
+    ps.comboMax = Math.max(ps.comboMax, s.comboMax);
+    if (s.noDamageRun && victory) ps.noDamageCount += 1;
+    if (stars === 3) ps.threeStars += 1;
+
+    const history: LevelHistory = {
+      score: Math.max(prevHigh, s.score),
+      stars: Math.max(prevStars, stars) as 0 | 1 | 2 | 3,
+      character: s.saveData.selectedCharacter,
+      bike: s.saveData.selectedBike,
+      paper: s.saveData.selectedPaper,
+      deliveries: s.deliveries,
+      coinsCollected: s.coinsCollected,
+      comboMax: s.comboMax,
+      damageTaken: s.damageTaken,
+      timeLeft: s.timeLeft,
+    };
 
     const newSave: SaveData = {
       ...s.saveData,
@@ -227,8 +228,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       starProgress: { ...s.saveData.starProgress, [level.id]: Math.max(prevStars, stars) as 0 | 1 | 2 | 3 },
       totalCoins: s.saveData.totalCoins + s.coinsCollected,
       totalDeliveries: s.saveData.totalDeliveries + s.deliveries,
+      persistentStats: ps,
+      levelHistory: { ...s.saveData.levelHistory, [level.id]: history },
     };
-    set({ saveData: newSave, sessionStats });
+    set({ saveData: newSave });
     saveSaveData(newSave);
 
     return result;
@@ -281,6 +284,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newlyUnlockedBikes: string[] = [];
     const newlyUnlockedPapers: string[] = [];
     const newlyUnlockedCharacters: string[] = [];
+    const ps = s.saveData.persistentStats;
 
     BIKES.forEach(b => {
       if (s.saveData.unlockedBikes.includes(b.id)) return;
@@ -295,13 +299,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           unlock = allOneStar;
           break;
         }
-        case 'bike-fixie': unlock = s.sessionStats.noDamageCount >= b.unlockValue; break;
+        case 'bike-fixie': unlock = ps.noDamageCount >= b.unlockValue; break;
         case 'bike-steampunk': {
           const totalScore = Object.values(s.saveData.highScores).reduce((a, b) => a + b, 0);
           unlock = totalScore >= b.unlockValue;
           break;
         }
-        case 'bike-neonfuture': unlock = s.sessionStats.threeStars >= b.unlockValue; break;
+        case 'bike-neonfuture': unlock = ps.threeStars >= b.unlockValue; break;
       }
       if (unlock) {
         const res = s.unlockItem('bike', b.id);
@@ -315,14 +319,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       switch (p.id) {
         case 'paper-daily': unlock = true; break;
         case 'paper-morning': unlock = s.saveData.totalDeliveries >= p.unlockValue; break;
-        case 'paper-sports': unlock = s.sessionStats.comboMax >= p.unlockValue; break;
+        case 'paper-sports': unlock = ps.comboMax >= p.unlockValue; break;
         case 'paper-finance': unlock = s.saveData.totalCoins >= p.unlockValue; break;
         case 'paper-comic': {
           const anyOver = Object.values(s.saveData.highScores).some(v => v >= p.unlockValue);
           unlock = anyOver;
           break;
         }
-        case 'paper-midnight': unlock = s.sessionStats.noDamageCount >= p.unlockValue; break;
+        case 'paper-midnight': unlock = ps.noDamageCount >= p.unlockValue; break;
       }
       if (unlock) {
         const res = s.unlockItem('paper', p.id);
@@ -337,8 +341,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         case 'char-tommy': unlock = true; break;
         case 'char-jenny': unlock = s.saveData.totalDeliveries >= c.unlockValue; break;
         case 'char-rocky': unlock = s.saveData.totalCoins >= c.unlockValue; break;
-        case 'char-miki': unlock = s.sessionStats.comboMax >= c.unlockValue; break;
-        case 'char-arthur': unlock = s.sessionStats.noDamageCount >= c.unlockValue; break;
+        case 'char-miki': unlock = ps.comboMax >= c.unlockValue; break;
+        case 'char-arthur': unlock = ps.noDamageCount >= c.unlockValue; break;
         case 'char-neo': {
           const totalScore = Object.values(s.saveData.highScores).reduce((a, b) => a + b, 0);
           unlock = totalScore >= c.unlockValue;
@@ -349,7 +353,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           unlock = allOneStar;
           break;
         }
-        case 'char-zara': unlock = s.sessionStats.threeStars >= c.unlockValue; break;
+        case 'char-zara': unlock = ps.threeStars >= c.unlockValue; break;
       }
       if (unlock) {
         const res = s.unlockItem('character', c.id);

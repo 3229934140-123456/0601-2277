@@ -12,6 +12,7 @@ import { GameEngine, EngineCallbacks } from '@/game/GameEngine';
 import { HitEffect } from '@/game/Renderer';
 import { getBikeById } from '@/data/bikes';
 import { getPaperById } from '@/data/papers';
+import { getCharacterById } from '@/data/characters';
 import { Play, Pause, ArrowLeft, RotateCcw, Home } from 'lucide-react';
 
 const CANVAS_W = 960;
@@ -41,6 +42,7 @@ export default function GameScreen() {
   const currentLevel = useGameStore(s => s.currentLevel);
   const selectedBikeId = useGameStore(s => s.saveData.selectedBike);
   const selectedPaperId = useGameStore(s => s.saveData.selectedPaper);
+  const selectedCharacterId = useGameStore(s => s.saveData.selectedCharacter);
   const startLevel = useGameStore(s => s.startLevel);
   const setPaused = useGameStore(s => s.setPaused);
   const isPaused = useGameStore(s => s.isPaused);
@@ -84,6 +86,7 @@ export default function GameScreen() {
 
     const bike = getBikeById(selectedBikeId);
     const paper = getPaperById(selectedPaperId);
+    const character = getCharacterById(selectedCharacterId);
     const lvl = currentLevel;
 
     const cb: EngineCallbacks = {
@@ -128,7 +131,7 @@ export default function GameScreen() {
       usePaper: () => useGameStore.getState().usePaper(),
     };
 
-    const engine = new GameEngine(lvl, bike, paper, cb);
+    const engine = new GameEngine(lvl, bike, paper, character, cb);
     engineRef.current = engine;
     engine.start();
 
@@ -143,7 +146,7 @@ export default function GameScreen() {
       renderRafRef.current = requestAnimationFrame(render);
     };
     renderRafRef.current = requestAnimationFrame(render);
-  }, [currentLevel, selectedBikeId, selectedPaperId, playSfx]);
+  }, [currentLevel, selectedBikeId, selectedPaperId, selectedCharacterId, playSfx]);
 
   useEffect(() => {
     if (!currentLevel) return;

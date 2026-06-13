@@ -10,6 +10,26 @@ export interface GameSettings {
   sfxVolume: number;
 }
 
+export interface PersistentStats {
+  deliveriesCount: number;
+  comboMax: number;
+  noDamageCount: number;
+  threeStars: number;
+}
+
+export interface LevelHistory {
+  score: number;
+  stars: 0 | 1 | 2 | 3;
+  character: string;
+  bike: string;
+  paper: string;
+  deliveries: number;
+  coinsCollected: number;
+  comboMax: number;
+  damageTaken: number;
+  timeLeft: number;
+}
+
 export interface SaveData {
   highScores: Record<string, number>;
   starProgress: Record<string, 0 | 1 | 2 | 3>;
@@ -21,6 +41,8 @@ export interface SaveData {
   selectedCharacter: string;
   totalCoins: number;
   totalDeliveries: number;
+  persistentStats: PersistentStats;
+  levelHistory: Record<string, LevelHistory>;
   settings: GameSettings;
 }
 
@@ -34,6 +56,13 @@ export const defaultSettings: GameSettings = {
   sfxVolume: 0.6,
 };
 
+export const defaultPersistentStats: PersistentStats = {
+  deliveriesCount: 0,
+  comboMax: 0,
+  noDamageCount: 0,
+  threeStars: 0,
+};
+
 export const defaultSaveData: SaveData = {
   highScores: {},
   starProgress: {},
@@ -45,21 +74,25 @@ export const defaultSaveData: SaveData = {
   selectedCharacter: 'char-tommy',
   totalCoins: 0,
   totalDeliveries: 0,
+  persistentStats: { ...defaultPersistentStats },
+  levelHistory: {},
   settings: defaultSettings,
 };
 
 export function loadSaveData(): SaveData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...defaultSaveData };
+    if (!raw) return { ...defaultSaveData, persistentStats: { ...defaultPersistentStats }, levelHistory: {} };
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
       ...defaultSaveData,
       ...parsed,
+      persistentStats: { ...defaultPersistentStats, ...(parsed.persistentStats || {}) },
+      levelHistory: parsed.levelHistory || {},
       settings: { ...defaultSettings, ...(parsed.settings || {}) },
     };
   } catch {
-    return { ...defaultSaveData };
+    return { ...defaultSaveData, persistentStats: { ...defaultPersistentStats }, levelHistory: {} };
   }
 }
 

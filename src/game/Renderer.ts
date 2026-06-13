@@ -2,6 +2,7 @@ import { Level, MAP_W, MAP_H, TILE_SIZE } from '@/data/levels';
 import { drawPixelRect, drawPixelBorder, drawPixelText } from '@/utils/pixel';
 import { BikeSkin } from '@/data/bikes';
 import { PaperSkin } from '@/data/papers';
+import { CharacterSkin } from '@/data/characters';
 
 const STREET_START = 7;
 const STREET_END = 15;
@@ -214,9 +215,11 @@ export function drawPlayer(
   ctx: CanvasRenderingContext2D,
   p: PlayerRenderState,
   bike: BikeSkin,
+  character: CharacterSkin,
   time: number
 ) {
   const [cFrame, cDark, cLight, tireC, rimC] = bike.colors;
+  const [charSkin, charHair, charShirt, charPants, charAccent] = character.colors;
   const flash = p.invincibleFlash > 0 && Math.floor(time / 60) % 2 === 0;
   if (flash) return;
 
@@ -246,15 +249,15 @@ export function drawPlayer(
   drawPixelRect(ctx, 0, 2, 3, 9, cDark);
   drawPixelRect(ctx, -10, -3, 5, 2, cDark);
 
-  drawPixelRect(ctx, -2, -10 + wobble, 8, 8, '#FFD8A8');
-  drawPixelRect(ctx, 0, -12 + wobble, 4, 3, '#5C3A21');
+  drawPixelRect(ctx, -2, -10 + wobble, 8, 8, charSkin);
+  drawPixelRect(ctx, 0, -12 + wobble, 4, 3, charHair);
   drawPixelRect(ctx, -2, -6 + wobble, 2, 1, '#000000');
   drawPixelRect(ctx, 4, -6 + wobble, 2, 1, '#000000');
 
-  drawPixelRect(ctx, 0, -2 + wobble, 6, 6, cLight);
+  drawPixelRect(ctx, 0, -2 + wobble, 6, 6, charShirt);
 
-  drawPixelRect(ctx, -8, 0, 3, 3, '#FFD8A8');
-  drawPixelRect(ctx, 8, -5, 3, 3, '#FFD8A8');
+  drawPixelRect(ctx, -8, 0, 3, 3, charSkin);
+  drawPixelRect(ctx, 8, -5, 3, 3, charSkin);
   drawPixelRect(ctx, -4, -4, 12, 2, '#888888');
 
   ctx.restore();

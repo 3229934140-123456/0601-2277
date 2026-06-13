@@ -7,6 +7,7 @@ import {
 import { aabbOverlap, clamp } from '@/utils/pixel';
 import { BikeSkin } from '@/data/bikes';
 import { PaperSkin } from '@/data/papers';
+import { CharacterSkin } from '@/data/characters';
 
 export interface EngineCallbacks {
   onScore: (delta: number) => void;
@@ -26,6 +27,7 @@ export class GameEngine {
   level: Level;
   bike: BikeSkin;
   paper: PaperSkin;
+  character: CharacterSkin;
   player: PlayerRenderState;
   papers: PaperRenderState[] = [];
   obstacles: ObstacleRuntime[] = [];
@@ -47,10 +49,11 @@ export class GameEngine {
   callbacks: EngineCallbacks;
   paperPool: PaperRenderState[] = [];
 
-  constructor(level: Level, bike: BikeSkin, paper: PaperSkin, cb: EngineCallbacks) {
+  constructor(level: Level, bike: BikeSkin, paper: PaperSkin, character: CharacterSkin, cb: EngineCallbacks) {
     this.level = level;
     this.bike = bike;
     this.paper = paper;
+    this.character = character;
     this.callbacks = cb;
     this.player = {
       x: level.startX,
@@ -310,7 +313,7 @@ export class GameEngine {
     drawObstacles(ctx, this.obstacles);
     drawAimIndicator(ctx, this.player, this.aimAngle, this.charge, this.charging);
     this.paperPool.forEach(p => drawPaper(ctx, p, this.paper));
-    drawPlayer(ctx, this.player, this.bike, this.time);
+    drawPlayer(ctx, this.player, this.bike, this.character, this.time);
     drawEffects(ctx, this.effects);
     drawMinimap(ctx, this.level, this.player, this.houseDelivered, 12, 12);
   }

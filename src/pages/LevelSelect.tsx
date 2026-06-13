@@ -6,7 +6,10 @@ import ScanlineOverlay from '@/components/ScanlineOverlay';
 import { useGameStore } from '@/store/useGameStore';
 import { useAudio } from '@/hooks/useAudio';
 import { LEVELS, isLevelUnlocked, Level } from '@/data/levels';
-import { ArrowLeft, Lock, Trophy, Clock, Target, Shield, Coins } from 'lucide-react';
+import { getBikeById } from '@/data/bikes';
+import { getPaperById } from '@/data/papers';
+import { getCharacterById } from '@/data/characters';
+import { ArrowLeft, Lock, Trophy, Clock, Target, Shield, Coins, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function LevelSelect() {
@@ -14,13 +17,18 @@ export default function LevelSelect() {
   const { playSfx } = useAudio();
   const starProgress = useGameStore(s => s.saveData.starProgress);
   const highScores = useGameStore(s => s.saveData.highScores);
-  const [hoverLevel, setHoverLevel] = useState<Level | null>(null);
+  const levelHistory = useGameStore(s => s.saveData.levelHistory);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
   const handleStart = (level: Level) => {
     if (!isLevelUnlocked(level.id, starProgress)) return;
     playSfx('menu');
     useGameStore.getState().startLevel(level.id);
     navigate(`/game/${level.id}`);
+  };
+
+  const toggleExpand = (levelId: string) => {
+    setExpandedLevel(prev => prev === levelId ? null : levelId);
   };
 
   return (
@@ -38,76 +46,124 @@ export default function LevelSelect() {
           <div className="w-[120px]" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
           {LEVELS.map((level, idx) => {
             const unlocked = isLevelUnlocked(level.id, starProgress);
             const stars = starProgress[level.id] || 0;
             const high = highScores[level.id] || 0;
+            const history = levelHistory[level.id];
+            const expanded = expandedLevel === level.id;
 
             return (
-              <button
-                key={level.id}
-                disabled={!unlocked}
-                onClick={() => handleStart(level)}
-                onMouseEnter={() => setHoverLevel(level)}
-                onMouseLeave={() => setHoverLevel(null)}
-                className={clsx(
-                  'pixel-border text-left p-5 transition-all hover:-translate-y-1 relative',
-                  unlocked ? 'bg-pixel-brown hover:bg-pixel-brownLight' : 'bg-pixel-brown/60 cursor-not-allowed',
-                )}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="font-pixel text-sm text-pixel-yellow pixel-text-shadow-sm">
-                    第{idx + 1}关
-                  </div>
-                  {!unlocked && (
-                    <div className="bg-pixel-red text-white px-2 py-1 rounded-sm flex items-center gap-1 font-pixel text-[10px]">
-                      <Lock className="w-3 h-3" /> 锁定
+              <div key={level.id} className={clsx('pixel-border transition-all', unlocked ? 'bg-pixel-brown' : 'bg-pixel-brown/60')}>
+                <div className="flex items-stretch">
+                  <button
+                    disabled={!unlocked}
+                    onClick={() => handleStart(level)}
+                    className="flex-1 text-left p-4 md:p-5 flex items-center gap-4 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-16 h-12 shrink-0">
+                      <LevelThumbnail level={level} />
+                      {!unlocked && (
+                        <div className="relative -mt-12 h-12 bg-black/70 flex items-center justify-center">
+                          <Lock className="w-8 h-8 text-pixel-yellow" />
+                        </div>
+                      )}
                     </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-pixel text-sm text-pixel-yellow pixel-text-shadow-sm">第{idx + 1}关</span>
+                        {!unlocked && (
+                          <span className="bg-pixel-red text-white px-2 py-0.5 font-pixel text-[8px] flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> 锁定
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-pixel text-base text-pixel-paper pixel-text-shadow-sm">{level.name}</div>
+                      <div className="font-retro text-sm text-pixel-paper/70 mt-0.5">{level.description}</div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <PixelStars stars={stars} size="sm" animate={false} />
+                      <div className="font-pixel text-[10px] text-pixel-gold tabular-nums mt-1">
+                        {high.toString().padStart(5, '0')}
+                      </div>
+                    </div>
+                  </button>
+
+                  {unlocked && (
+                    <button
+                      onClick={() => toggleExpand(level.id)}
+                      className="px-3 border-l-4 border-pixel-yellow/30 hover:bg-pixel-brownLight transition-colors flex items-center"
+                    >
+                      {expanded ? <ChevronUp className="w-5 h-5 text-pixel-yellow" /> : <ChevronDown className="w-5 h-5 text-pixel-yellow" />}
+                    </button>
                   )}
                 </div>
 
-                <div className="mb-3 relative">
-                  <LevelThumbnail level={level} />
-                  {!unlocked && (
-                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                      <Lock className="w-12 h-12 text-pixel-yellow" />
+                {expanded && unlocked && (
+                  <div className="border-t-4 border-pixel-yellow/20 p-4 md:p-5 bg-pixel-brown/80">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="font-pixel text-[10px] text-pixel-yellow mb-3 flex items-center gap-1">
+                          <Trophy className="w-3 h-3" /> 三星挑战进度
+                        </div>
+                        <div className="space-y-2">
+                          <StarProgressLine
+                            color="#CD7F32"
+                            text={level.starConditions.one.desc}
+                            done={stars >= 1}
+                          />
+                          <StarProgressLine
+                            color="#C0C0C0"
+                            text={level.starConditions.two.desc}
+                            done={stars >= 2}
+                          />
+                          <StarProgressLine
+                            color="#FFD700"
+                            text={level.starConditions.three.desc}
+                            done={stars >= 3}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="font-pixel text-[10px] text-pixel-yellow mb-3">历史最佳记录</div>
+                        {history ? (
+                          <div className="space-y-1.5 font-retro text-sm">
+                            <BestRow icon={<Target className="w-3 h-3 text-pixel-green" />} label="投递" value={`${history.deliveries}份`} />
+                            <BestRow icon={<Coins className="w-3 h-3 text-pixel-yellow" />} label="金币" value={`${history.coinsCollected}枚`} />
+                            <BestRow icon={<Trophy className="w-3 h-3 text-pixel-blue" />} label="连击" value={`x${history.comboMax}`} />
+                            <BestRow icon={<Shield className="w-3 h-3" />} label="受伤"
+                              value={history.damageTaken === 0 ? '无伤!' : `${history.damageTaken}次`}
+                              accent={history.damageTaken === 0}
+                            />
+                            <BestRow icon={<Clock className="w-3 h-3 text-pixel-blue" />} label="余时" value={`${Math.ceil(history.timeLeft)}s`} />
+                            <div className="border-t-2 border-pixel-yellow/20 pt-1.5 mt-1.5">
+                              <div className="font-pixel text-[8px] text-pixel-paper/50 mb-1">使用配置</div>
+                              <div className="flex gap-3">
+                                <ConfigTag label="角色" name={getCharacterById(history.character)?.name || '-'} />
+                                <ConfigTag label="自行车" name={getBikeById(history.bike)?.name || '-'} />
+                                <ConfigTag label="报纸" name={getPaperById(history.paper)?.name || '-'} />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="font-retro text-sm text-pixel-paper/50 italic">尚未通关</div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                <div className="font-pixel text-base text-pixel-paper pixel-text-shadow-sm mb-1">
-                  {level.name}
-                </div>
-                <div className="font-retro text-sm text-pixel-paper/70 mb-3 min-h-[2.5rem]">
-                  {level.description}
-                </div>
-
-                <div className="flex items-center justify-between mb-3">
-                  <PixelStars stars={stars} size="sm" animate={false} />
-                  <div className="font-pixel text-[10px] text-pixel-gold tabular-nums">
-                    最高: {high.toString().padStart(5, '0')}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 font-retro text-xs text-pixel-paper/80">
-                  <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-pixel-blue" />{level.timeLimit}s</div>
-                  <div className="flex items-center gap-1"><Target className="w-3 h-3 text-pixel-green" />{level.targetDeliveries}份</div>
-                </div>
-
-                {hoverLevel?.id === level.id && unlocked && (
-                  <div className="absolute left-0 right-0 -bottom-[210px] z-20 pixel-border-sm bg-pixel-bg p-4 mt-2" style={{ borderColor: '#FFD93D' }}>
-                    <div className="font-pixel text-[10px] text-pixel-yellow mb-2 flex items-center gap-1">
-                      <Trophy className="w-3 h-3" /> 三星条件
-                    </div>
-                    <div className="space-y-1 font-retro text-sm">
-                      <StarLine color="#CD7F32" text={level.starConditions.one.desc} done={stars >= 1} />
-                      <StarLine color="#C0C0C0" text={level.starConditions.two.desc} done={stars >= 2} />
-                      <StarLine color="#FFD700" text={level.starConditions.three.desc} done={stars >= 3} />
+                    <div className="mt-4 flex justify-end">
+                      <PixelButton variant="yellow" size="sm"
+                        onClick={() => handleStart(level)}>
+                        开始挑战
+                      </PixelButton>
                     </div>
                   </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
@@ -116,20 +172,44 @@ export default function LevelSelect() {
   );
 }
 
-function StarLine({ color, text, done }: { color: string; text: string; done: boolean }) {
+function StarProgressLine({ color, text, done }: { color: string; text: string; done: boolean }) {
   return (
-    <div className={`flex items-start gap-2 ${done ? '' : 'opacity-60'}`}>
-      <div className="w-4 h-4 mt-0.5 shrink-0" style={{ background: done ? color : 'transparent', border: `2px solid ${color}` }} />
-      <div className={done ? 'text-pixel-paper' : 'text-pixel-paper/60'}>
-        {done && '✅ '}{text}
+    <div className={`flex items-center gap-2 font-retro text-sm ${done ? '' : 'opacity-70'}`}>
+      <div className="w-5 h-5 shrink-0 flex items-center justify-center"
+        style={{ background: done ? color : 'transparent', border: `2px solid ${color}` }}>
+        {done && <Check className="w-3 h-3 text-pixel-bg" strokeWidth={3} />}
       </div>
+      <span className={done ? 'text-pixel-paper' : 'text-pixel-paper/60'}>
+        {done ? '✅ ' : ''}{text}
+      </span>
+      {!done && <span className="ml-auto text-pixel-red/80 font-pixel text-[8px]">未达成</span>}
+      {done && <span className="ml-auto text-pixel-green font-pixel text-[8px]">已达成</span>}
+    </div>
+  );
+}
+
+function BestRow({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {icon}
+      <span className="text-pixel-paper/60 w-10">{label}</span>
+      <span className={accent ? 'text-pixel-green font-pixel text-xs' : 'text-pixel-paper'}>{value}</span>
+    </div>
+  );
+}
+
+function ConfigTag({ label, name }: { label: string; name: string }) {
+  return (
+    <div className="pixel-border-sm bg-pixel-bg px-1.5 py-0.5">
+      <span className="font-pixel text-[7px] text-pixel-paper/50">{label}</span>
+      <span className="font-retro text-xs text-pixel-paper ml-1">{name}</span>
     </div>
   );
 }
 
 function LevelThumbnail({ level }: { level: Level }) {
   return (
-    <div className="aspect-[3/2] bg-pixel-bg overflow-hidden relative border-2 border-pixel-yellow/40">
+    <div className="aspect-[4/3] bg-pixel-bg overflow-hidden relative border-2 border-pixel-yellow/40 w-full">
       <svg viewBox="0 0 96 64" className="w-full h-full" preserveAspectRatio="none" style={{ imageRendering: 'pixelated' }}>
         <rect x="0" y="0" width="96" height="64" fill="#7EC850" />
         <rect x="0" y="22" width="96" height="26" fill="#555555" />
@@ -143,7 +223,6 @@ function LevelThumbnail({ level }: { level: Level }) {
             <polygon points={`${6 + i * 30},4 ${16 + i * 30},-1 ${26 + i * 30},4`} fill={i % 2 ? '#8B4513' : '#A52A2A'} />
             <rect x={8 + i * 30} y={8} width={4} height={4} fill="#ADD8E6" />
             <rect x={20 + i * 30} y={8} width={4} height={4} fill="#ADD8E6" />
-
             <rect x={6 + i * 30} y={46} width={20} height={14} fill={i % 2 ? '#E6CFA1' : '#FFEFD5'} />
             <polygon points={`${6 + i * 30},60 ${16 + i * 30},65 ${26 + i * 30},60`} fill={i % 2 ? '#556B2F' : '#4682B4'} />
             <rect x={8 + i * 30} y={50} width={4} height={4} fill="#ADD8E6" />
