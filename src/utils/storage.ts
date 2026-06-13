@@ -15,8 +15,10 @@ export interface SaveData {
   starProgress: Record<string, 0 | 1 | 2 | 3>;
   unlockedBikes: string[];
   unlockedPapers: string[];
+  unlockedCharacters: string[];
   selectedBike: string;
   selectedPaper: string;
+  selectedCharacter: string;
   totalCoins: number;
   totalDeliveries: number;
   settings: GameSettings;
@@ -37,8 +39,10 @@ export const defaultSaveData: SaveData = {
   starProgress: {},
   unlockedBikes: ['bike-classic'],
   unlockedPapers: ['paper-daily'],
+  unlockedCharacters: ['char-tommy'],
   selectedBike: 'bike-classic',
   selectedPaper: 'paper-daily',
+  selectedCharacter: 'char-tommy',
   totalCoins: 0,
   totalDeliveries: 0,
   settings: defaultSettings,

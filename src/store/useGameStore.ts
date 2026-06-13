@@ -3,6 +3,7 @@ import { loadSaveData, saveSaveData, defaultSaveData, SaveData, GameSettings } f
 import { LEVELS, getLevelById, Level, LevelResult } from '@/data/levels';
 import { BIKES } from '@/data/bikes';
 import { PAPERS } from '@/data/papers';
+import { CHARACTERS } from '@/data/characters';
 
 interface GameState {
   saveData: SaveData;
@@ -43,13 +44,13 @@ interface GameState {
   tickTime: (delta: number) => void;
   endGame: (victory: boolean) => LevelResult | null;
   updateSettings: (settings: Partial<GameSettings>) => void;
-  unlockItem: (type: 'bike' | 'paper', id: string) => { newlyUnlocked: string[] };
-  selectSkin: (type: 'bike' | 'paper', id: string) => void;
+  unlockItem: (type: 'bike' | 'paper' | 'character', id: string) => { newlyUnlocked: string[] };
+  selectSkin: (type: 'bike' | 'paper' | 'character', id: string) => void;
   setCharge: (v: number) => void;
   setCharging: (v: boolean) => void;
   setPaused: (v: boolean) => void;
   usePaper: () => boolean;
-  checkAllUnlocks: () => { newlyUnlockedBikes: string[]; newlyUnlockedPapers: string[] };
+  checkAllUnlocks: () => { newlyUnlockedBikes: string[]; newlyUnlockedPapers: string[]; newlyUnlockedCharacters: string[] };
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -246,7 +247,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   unlockItem(type, id) {
     const s = get();
-    const key = type === 'bike' ? 'unlockedBikes' : 'unlockedPapers';
+    let key: 'unlockedBikes' | 'unlockedPapers' | 'unlockedCharacters';
+    if (type === 'bike') key = 'unlockedBikes';
+    else if (type === 'paper') key = 'unlockedPapers';
+    else key = 'unlockedCharacters';
     const list = s.saveData[key];
     if (list.includes(id)) return { newlyUnlocked: [] };
     const newSave = { ...s.saveData, [key]: [...list, id] };
@@ -257,8 +261,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   selectSkin(type, id) {
     const s = get();
-    const key = type === 'bike' ? 'selectedBike' : 'selectedPaper';
-    const unlockKey = type === 'bike' ? 'unlockedBikes' : 'unlockedPapers';
+    let key: 'selectedBike' | 'selectedPaper' | 'selectedCharacter';
+    let unlockKey: 'unlockedBikes' | 'unlockedPapers' | 'unlockedCharacters';
+    if (type === 'bike') { key = 'selectedBike'; unlockKey = 'unlockedBikes'; }
+    else if (type === 'paper') { key = 'selectedPaper'; unlockKey = 'unlockedPapers'; }
+    else { key = 'selectedCharacter'; unlockKey = 'unlockedCharacters'; }
     if (!s.saveData[unlockKey].includes(id)) return;
     const newSave = { ...s.saveData, [key]: id };
     set({ saveData: newSave });
@@ -273,6 +280,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const s = get();
     const newlyUnlockedBikes: string[] = [];
     const newlyUnlockedPapers: string[] = [];
+    const newlyUnlockedCharacters: string[] = [];
 
     BIKES.forEach(b => {
       if (s.saveData.unlockedBikes.includes(b.id)) return;
@@ -322,6 +330,33 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     });
 
-    return { newlyUnlockedBikes, newlyUnlockedPapers };
+    CHARACTERS.forEach(c => {
+      if (s.saveData.unlockedCharacters.includes(c.id)) return;
+      let unlock = false;
+      switch (c.id) {
+        case 'char-tommy': unlock = true; break;
+        case 'char-jenny': unlock = s.saveData.totalDeliveries >= c.unlockValue; break;
+        case 'char-rocky': unlock = s.saveData.totalCoins >= c.unlockValue; break;
+        case 'char-miki': unlock = s.sessionStats.comboMax >= c.unlockValue; break;
+        case 'char-arthur': unlock = s.sessionStats.noDamageCount >= c.unlockValue; break;
+        case 'char-neo': {
+          const totalScore = Object.values(s.saveData.highScores).reduce((a, b) => a + b, 0);
+          unlock = totalScore >= c.unlockValue;
+          break;
+        }
+        case 'char-pete': {
+          const allOneStar = LEVELS.every(l => (s.saveData.starProgress[l.id] || 0) >= 1);
+          unlock = allOneStar;
+          break;
+        }
+        case 'char-zara': unlock = s.sessionStats.threeStars >= c.unlockValue; break;
+      }
+      if (unlock) {
+        const res = s.unlockItem('character', c.id);
+        newlyUnlockedCharacters.push(...res.newlyUnlocked);
+      }
+    });
+
+    return { newlyUnlockedBikes, newlyUnlockedPapers, newlyUnlockedCharacters };
   },
 }));

@@ -8,6 +8,7 @@ import { useAudio } from '@/hooks/useAudio';
 import { getLevelById, LevelResult } from '@/data/levels';
 import { BIKES, getBikeById } from '@/data/bikes';
 import { PAPERS, getPaperById } from '@/data/papers';
+import { getCharacterById } from '@/data/characters';
 import { ArrowLeft, RotateCcw, Home, Award, Check, X } from 'lucide-react';
 
 interface LocState {
@@ -42,7 +43,7 @@ export default function ResultScreen() {
   const [stars, setStars] = useState<0 | 1 | 2 | 3>(0);
   const [newRecord, setNewRecord] = useState(false);
   const [showStars, setShowStars] = useState(false);
-  const [newlyUnlocked, setNewlyUnlocked] = useState<{ bikes: string[]; papers: string[] }>({ bikes: [], papers: [] });
+  const [newlyUnlocked, setNewlyUnlocked] = useState<{ bikes: string[]; papers: string[]; characters: string[] }>({ bikes: [], papers: [], characters: [] });
   const victory = locState?.victory ?? true;
 
   useEffect(() => {
@@ -60,8 +61,8 @@ export default function ResultScreen() {
     setNewRecord(score > prevHigh);
     setTimeout(() => setShowStars(true), 600);
 
-    const { newlyUnlockedBikes, newlyUnlockedPapers } = checkAllUnlocks();
-    setNewlyUnlocked({ bikes: newlyUnlockedBikes, papers: newlyUnlockedPapers });
+    const { newlyUnlockedBikes, newlyUnlockedPapers, newlyUnlockedCharacters } = checkAllUnlocks();
+    setNewlyUnlocked({ bikes: newlyUnlockedBikes, papers: newlyUnlockedPapers, characters: newlyUnlockedCharacters || [] });
 
     setTimeout(() => playSfx(s >= 2 ? 'victory' : 'menu'), 300);
   }, [level]);
@@ -141,7 +142,7 @@ export default function ResultScreen() {
             </div>
           </div>
 
-          {(newlyUnlocked.bikes.length > 0 || newlyUnlocked.papers.length > 0) && (
+          {(newlyUnlocked.bikes.length > 0 || newlyUnlocked.papers.length > 0 || (newlyUnlocked.characters || []).length > 0) && (
             <div className="pixel-border-sm bg-gradient-to-r from-purple-900/60 to-indigo-900/60 p-4 mb-6 border-purple-400" style={{ borderColor: '#9F7AEA' }}>
               <div className="font-pixel text-xs text-purple-300 mb-3 animate-pulse">
                 🎁 解锁新物品!
@@ -167,6 +168,19 @@ export default function ResultScreen() {
                       <div>
                         <span className="text-pixel-yellow font-pixel text-xs">报纸 </span>
                         <span className="text-pixel-paper">{p.name}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(newlyUnlocked.characters || []).map(id => {
+                  const ch = getCharacterById(id);
+                  if (!ch) return null;
+                  return (
+                    <div key={id} className="flex items-center gap-3 font-retro text-base">
+                      <div className="w-10 h-10 bg-pixel-bg border-2 border-purple-400 flex items-center justify-center">🧑</div>
+                      <div>
+                        <span className="text-pixel-yellow font-pixel text-xs">角色 </span>
+                        <span className="text-pixel-paper">{ch.name}</span>
                       </div>
                     </div>
                   );

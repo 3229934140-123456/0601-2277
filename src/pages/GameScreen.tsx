@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PixelButton from '@/components/PixelButton';
 import PixelStars from '@/components/PixelStars';
@@ -6,13 +6,12 @@ import ScanlineOverlay from '@/components/ScanlineOverlay';
 import HudBar from '@/components/HudBar';
 import ChargeBar from '@/components/ChargeBar';
 import { useGameStore } from '@/store/useGameStore';
-import { useAudio, SfxName } from '@/hooks/useAudio';
+import { useAudio } from '@/hooks/useAudio';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { GameEngine, EngineCallbacks } from '@/game/GameEngine';
 import { HitEffect } from '@/game/Renderer';
 import { getBikeById } from '@/data/bikes';
 import { getPaperById } from '@/data/papers';
-import { getLevelById, LevelResult } from '@/data/levels';
 import { Play, Pause, ArrowLeft, RotateCcw, Home } from 'lucide-react';
 
 const CANVAS_W = 960;
@@ -24,11 +23,20 @@ export default function GameScreen() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const rafRef = useRef(0);
+  const renderRafRef = useRef(0);
   const { playSfx } = useAudio();
-  const { keyState, consumeJustPressed, getActionHoldTime, resetAction } = useKeyboard();
+  const { keyState, consumeJustPressed, resetAction } = useKeyboard();
   const [showPause, setShowPause] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(3);
   const endedRef = useRef(false);
+  const countdownRef = useRef<number | null>(3);
+
+  const comboRef = useRef(0);
+  const isPausedRef = useRef(false);
+  const isGameOverRef = useRef(false);
+  const isVictoryRef = useRef(false);
+  const showPauseRef = useRef(false);
+  const engineCreatedRef = useRef(false);
 
   const currentLevel = useGameStore(s => s.currentLevel);
   const selectedBikeId = useGameStore(s => s.saveData.selectedBike);
@@ -42,24 +50,38 @@ export default function GameScreen() {
   const tickTime = useGameStore(s => s.tickTime);
   const endGame = useGameStore(s => s.endGame);
 
+  useEffect(() => { countdownRef.current = countdown; }, [countdown]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { isGameOverRef.current = isGameOver; }, [isGameOver]);
+  useEffect(() => { isVictoryRef.current = isVictory; }, [isVictory]);
+  useEffect(() => { showPauseRef.current = showPause; }, [showPause]);
+
   useEffect(() => {
     if (!currentLevel || currentLevel.id !== levelId) {
+      engineCreatedRef.current = false;
       startLevel(levelId);
     }
   }, [levelId, currentLevel, startLevel]);
 
   useEffect(() => {
-    if (countdown === null || countdown <= 0) return;
-    const t = setTimeout(() => setCountdown(c => (c === null ? c : c - 1)), 800);
-    if (countdown <= 0) {
-      setCountdown(null);
-      playSfx('powerup');
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const t = setTimeout(() => setCountdown(c => (c === null ? c : c - 1)), 800);
+      return () => clearTimeout(t);
+    } else {
+      const t = setTimeout(() => {
+        setCountdown(null);
+        playSfx('powerup');
+      }, 600);
+      return () => clearTimeout(t);
     }
-    return () => clearTimeout(t);
   }, [countdown, playSfx]);
 
-  useEffect(() => {
-    if (!currentLevel || !canvasRef.current) return;
+  const createEngine = useCallback(() => {
+    if (!currentLevel || !canvasRef.current || engineCreatedRef.current) return;
+    engineCreatedRef.current = true;
+
     const bike = getBikeById(selectedBikeId);
     const paper = getPaperById(selectedPaperId);
     const lvl = currentLevel;
@@ -70,8 +92,16 @@ export default function GameScreen() {
         const bonus = 1 + Math.min(2, s.combo * 0.1);
         const total = Math.round(delta * bonus);
         s.updateScore(total);
-        if (combo >= 3) {
-          engineRef.current!.addEffect({ type: 'text', x: engineRef.current!.player.x, y: engineRef.current!.player.y - 30, life: 0.8, maxLife: 0.8, text: `x${s.combo + 1}`, color: '#FFD93D' });
+        if (comboRef.current >= 3 && engineRef.current) {
+          engineRef.current.addEffect({
+            type: 'text',
+            x: engineRef.current.player.x,
+            y: engineRef.current.player.y - 30,
+            life: 0.8,
+            maxLife: 0.8,
+            text: `x${s.combo + 1}`,
+            color: '#FFD93D'
+          });
         }
       },
       onCombo: () => useGameStore.getState().addCombo(),
@@ -104,67 +134,110 @@ export default function GameScreen() {
 
     const render = () => {
       const ctx = canvasRef.current?.getContext('2d');
-      if (ctx) {
+      if (ctx && engineRef.current) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        engine.render(ctx);
+        engineRef.current.render(ctx);
         ctx.restore();
       }
-      rafRef.current = requestAnimationFrame(render);
+      renderRafRef.current = requestAnimationFrame(render);
     };
-    rafRef.current = requestAnimationFrame(render);
-
-    return () => {
-      engine.stop();
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [currentLevel, selectedBikeId, selectedPaperId, playSfx, combo]);
+    renderRafRef.current = requestAnimationFrame(render);
+  }, [currentLevel, selectedBikeId, selectedPaperId, playSfx]);
 
   useEffect(() => {
-    if (!engineRef.current || countdown !== null) return;
-    const engine = engineRef.current;
-    const paused = isPaused || showPause;
-    engine.setPaused(paused);
-    setPaused(paused);
+    if (!currentLevel) return;
+    createEngine();
+    return () => {
+      if (engineRef.current) {
+        engineRef.current.stop();
+        engineRef.current = null;
+      }
+      cancelAnimationFrame(renderRafRef.current);
+      engineCreatedRef.current = false;
+    };
+  }, [currentLevel, createEngine]);
 
-    if (paused) return;
+  useEffect(() => {
+    let running = true;
+    const loop = () => {
+      if (!running) return;
+      try {
+        if (!engineRef.current || countdownRef.current !== null) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        const engine = engineRef.current;
+        const paused = isPausedRef.current || showPauseRef.current;
+        engine.setPaused(paused);
 
-    let dx = 0, dy = 0;
-    if (keyState.current.left) dx -= 1;
-    if (keyState.current.right) dx += 1;
-    if (keyState.current.up) dy -= 1;
-    if (keyState.current.down) dy += 1;
+        if (!paused) {
+          let dx = 0, dy = 0;
+          if (keyState.current.left) dx -= 1;
+          if (keyState.current.right) dx += 1;
+          if (keyState.current.up) dy -= 1;
+          if (keyState.current.down) dy += 1;
 
-    const onPuddle = engine.onPuddle();
-    engine.movePlayer(dx, dy, onPuddle);
-    tickTime(1 / 60);
+          const onPuddle = engine.onPuddle();
+          engine.movePlayer(dx, dy, onPuddle);
+          tickTime(1 / 60);
 
-    const playerTop = engine.player.y < CANVAS_H / 2;
-    const baseAngle = playerTop ? Math.PI / 2 : -Math.PI / 2;
-    const offset = dx === 0 ? 0 : dx > 0 ? -Math.PI / 5 : Math.PI / 5;
-    engine.setAimAngle(baseAngle + offset);
+          const playerTop = engine.player.y < CANVAS_H / 2;
+          const baseAngle = playerTop ? Math.PI / 2 : -Math.PI / 2;
+          const offset = dx === 0 ? 0 : dx > 0 ? -Math.PI / 5 : Math.PI / 5;
+          engine.setAimAngle(baseAngle + offset);
 
-    if (consumeJustPressed('action') && !engine.charging) {
-      engine.beginCharge();
-      playSfx('charge');
+          if (consumeJustPressed('action') && !engine.charging) {
+            engine.beginCharge();
+            playSfx('charge');
+          }
+          if (!keyState.current.action && engine.charging) {
+            engine.releaseCharge();
+            resetAction();
+          }
+          if (consumeJustPressed('pause')) {
+            setShowPause(p => {
+              const np = !p;
+              showPauseRef.current = np;
+              return np;
+            });
+            playSfx('menu');
+          }
+        }
+
+        if (isGameOverRef.current && !endedRef.current) {
+          endedRef.current = true;
+          const victory = isVictoryRef.current;
+          setTimeout(() => {
+            const result = endGame(victory);
+            if (result) navigate(`/result/${levelId}`, { state: { victory } });
+          }, 1200);
+        }
+      } catch (_e) { /* noop */ }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [levelId, keyState, consumeJustPressed, resetAction, tickTime, playSfx, endGame]);
+
+  const handleRestart = () => {
+    playSfx('menu');
+    endedRef.current = false;
+    if (engineRef.current) {
+      engineRef.current.stop();
+      engineRef.current = null;
     }
-    if (!keyState.current.action && engine.charging) {
-      engine.releaseCharge();
-      resetAction();
-    }
-    if (consumeJustPressed('pause')) {
-      setShowPause(p => !p);
-      playSfx('menu');
-    }
-
-    if (isGameOver && !endedRef.current) {
-      endedRef.current = true;
-      setTimeout(() => {
-        const result = endGame(isVictory);
-        if (result) navigate(`/result/${levelId}`, { state: { victory: isVictory } });
-      }, 1200);
-    }
-  });
+    cancelAnimationFrame(renderRafRef.current);
+    engineCreatedRef.current = false;
+    setShowPause(false);
+    showPauseRef.current = false;
+    setCountdown(3);
+    countdownRef.current = 3;
+    startLevel(levelId);
+  };
 
   if (!currentLevel) return null;
 
@@ -200,13 +273,15 @@ export default function GameScreen() {
               style={{ imageRendering: 'pixelated' }}
             />
 
-            {countdown !== null && countdown > 0 && (
+            {countdown !== null && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <div className="text-center">
                   <div className="font-pixel text-[120px] md:text-[160px] text-pixel-yellow pixel-text-shadow animate-pixel-float">
-                    {countdown}
+                    {countdown > 0 ? countdown : 'GO!'}
                   </div>
-                  <div className="font-pixel text-2xl text-pixel-green mt-4">准备出发!</div>
+                  <div className="font-pixel text-2xl text-pixel-green mt-4">
+                    {countdown > 0 ? '准备出发!' : '冲啊!'}
+                  </div>
                 </div>
               </div>
             )}
@@ -221,7 +296,7 @@ export default function GameScreen() {
                       继续游戏
                     </PixelButton>
                     <PixelButton variant="yellow" block icon={<RotateCcw className="w-4 h-4" />}
-                      onClick={() => { playSfx('menu'); startLevel(levelId); setShowPause(false); setCountdown(3); endedRef.current = false; }}>
+                      onClick={handleRestart}>
                       重新开始
                     </PixelButton>
                     <PixelButton variant="red" block icon={<ArrowLeft className="w-4 h-4" />}

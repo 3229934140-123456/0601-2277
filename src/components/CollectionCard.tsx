@@ -1,13 +1,18 @@
-import { BikeSkin, rarityColors } from '@/data/bikes';
-import { PaperSkin, paperRarityColors } from '@/data/papers';
+import { BikeSkin } from '@/data/bikes';
+import { PaperSkin } from '@/data/papers';
+import { CharacterSkin } from '@/data/characters';
+import { rarityColors } from '@/data/bikes';
+import { paperRarityColors } from '@/data/papers';
+import { characterRarityColors } from '@/data/characters';
 import { Lock } from 'lucide-react';
 import clsx from 'clsx';
 
-type ItemType = 'bike' | 'paper';
+export type ItemType = 'bike' | 'paper' | 'character';
+export type AnySkin = BikeSkin | PaperSkin | CharacterSkin;
 
 interface Props {
   type: ItemType;
-  item: BikeSkin | PaperSkin;
+  item: AnySkin;
   unlocked: boolean;
   selected: boolean;
   onClick?: () => void;
@@ -15,9 +20,11 @@ interface Props {
 }
 
 export default function CollectionCard({ type, item, unlocked, selected, onClick, onPreview }: Props) {
-  const rarity = type === 'bike'
-    ? rarityColors[(item as BikeSkin).rarity]
-    : paperRarityColors[(item as PaperSkin).rarity];
+  const rarity = (() => {
+    if (type === 'bike') return rarityColors[(item as BikeSkin).rarity];
+    if (type === 'paper') return paperRarityColors[(item as PaperSkin).rarity];
+    return characterRarityColors[(item as CharacterSkin).rarity];
+  })();
   const colors = item.colors;
 
   return (
@@ -36,8 +43,10 @@ export default function CollectionCard({ type, item, unlocked, selected, onClick
       >
         {type === 'bike' ? (
           <BikePreview colors={colors} />
-        ) : (
+        ) : type === 'paper' ? (
           <PaperPreview colors={colors} headline={(item as PaperSkin).headline} />
+        ) : (
+          <CharacterPreview colors={colors} />
         )}
         {!unlocked && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -64,7 +73,7 @@ export default function CollectionCard({ type, item, unlocked, selected, onClick
       </div>
 
       <div className="font-retro text-sm text-pixel-blue">
-        {type === 'bike' ? (item as BikeSkin).era : ''}
+        {type === 'bike' ? (item as BikeSkin).era : type === 'character' ? (item as CharacterSkin).era : ''}
       </div>
 
       <div className="mt-2 font-retro text-xs text-pixel-paper/70 line-clamp-2 min-h-[2rem]">
@@ -80,7 +89,7 @@ export default function CollectionCard({ type, item, unlocked, selected, onClick
   );
 }
 
-function BikePreview({ colors }: { colors: string[] }) {
+export function BikePreview({ colors }: { colors: string[] }) {
   const [frame, dark, light, tire, rim] = colors;
   return (
     <svg viewBox="0 0 64 64" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
@@ -105,7 +114,7 @@ function BikePreview({ colors }: { colors: string[] }) {
   );
 }
 
-function PaperPreview({ colors, headline }: { colors: string[]; headline: string }) {
+export function PaperPreview({ colors, headline }: { colors: string[]; headline: string }) {
   const [bg, ink, accent] = colors;
   return (
     <svg viewBox="0 0 64 64" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
@@ -122,6 +131,31 @@ function PaperPreview({ colors, headline }: { colors: string[]; headline: string
       <text x="32" y="17" textAnchor="middle" fontSize="4" fontFamily="monospace" fill={ink} fontWeight="bold">
         {headline.slice(0, 10)}
       </text>
+    </svg>
+  );
+}
+
+export function CharacterPreview({ colors }: { colors: string[] }) {
+  const [skin, hair, shirt, pants, accent] = colors;
+  return (
+    <svg viewBox="0 0 64 64" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
+      <rect x="24" y="8" width="16" height="16" fill={skin} />
+      <rect x="22" y="6" width="20" height="6" fill={hair} />
+      <rect x="20" y="8" width="4" height="10" fill={hair} />
+      <rect x="40" y="8" width="4" height="10" fill={hair} />
+      <rect x="27" y="14" width="2" height="2" fill="#000" />
+      <rect x="35" y="14" width="2" height="2" fill="#000" />
+      <rect x="30" y="18" width="4" height="2" fill={accent === '#FFFFFF' ? '#CD853F' : accent} />
+      <rect x="22" y="24" width="20" height="18" fill={shirt} />
+      <rect x="18" y="26" width="6" height="14" fill={shirt} />
+      <rect x="40" y="26" width="6" height="14" fill={shirt} />
+      <rect x="14" y="28" width="6" height="10" fill={skin} />
+      <rect x="44" y="28" width="6" height="10" fill={skin} />
+      <rect x="30" y="24" width="4" height="4" fill={accent} />
+      <rect x="24" y="42" width="7" height="16" fill={pants} />
+      <rect x="33" y="42" width="7" height="16" fill={pants} />
+      <rect x="22" y="56" width="10" height="4" fill="#333333" />
+      <rect x="32" y="56" width="10" height="4" fill="#333333" />
     </svg>
   );
 }
