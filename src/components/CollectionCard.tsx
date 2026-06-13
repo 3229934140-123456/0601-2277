@@ -4,6 +4,7 @@ import { CharacterSkin } from '@/data/characters';
 import { rarityColors } from '@/data/bikes';
 import { paperRarityColors } from '@/data/papers';
 import { characterRarityColors } from '@/data/characters';
+import { CharacterProgress, getCharacterTitle, getNextTitle } from '@/utils/storage';
 import { Lock } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -17,15 +18,18 @@ interface Props {
   selected: boolean;
   onClick?: () => void;
   onPreview?: () => void;
+  characterProgress?: CharacterProgress;
 }
 
-export default function CollectionCard({ type, item, unlocked, selected, onClick, onPreview }: Props) {
+export default function CollectionCard({ type, item, unlocked, selected, onClick, onPreview, characterProgress }: Props) {
   const rarity = (() => {
     if (type === 'bike') return rarityColors[(item as BikeSkin).rarity];
     if (type === 'paper') return paperRarityColors[(item as PaperSkin).rarity];
     return characterRarityColors[(item as CharacterSkin).rarity];
   })();
   const colors = item.colors;
+  const titleInfo = type === 'character' && characterProgress ? getCharacterTitle(characterProgress) : null;
+  const nextTitle = type === 'character' && characterProgress ? getNextTitle(characterProgress) : null;
 
   return (
     <button
@@ -75,6 +79,25 @@ export default function CollectionCard({ type, item, unlocked, selected, onClick
       <div className="font-retro text-sm text-pixel-blue">
         {type === 'bike' ? (item as BikeSkin).era : type === 'character' ? (item as CharacterSkin).era : ''}
       </div>
+
+      {type === 'character' && titleInfo && unlocked && (
+        <div className="mt-1 pixel-border-sm bg-pixel-yellow/10 px-1.5 py-0.5 text-center">
+          <div className="font-pixel text-[8px] text-pixel-gold leading-tight">
+            🏅 {titleInfo.title}
+          </div>
+          {nextTitle && characterProgress && (
+            <div className="mt-0.5">
+              <div className="h-1 bg-pixel-brown border border-pixel-yellow/30 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-pixel-yellow to-pixel-green"
+                  style={{ width: `${Math.min(100, (characterProgress.playCount / nextTitle.threshold) * 100)}%` }} />
+              </div>
+              <div className="font-retro text-[8px] text-pixel-paper/50 mt-0.5 truncate">
+                {characterProgress.playCount}/{nextTitle.threshold}场
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-2 font-retro text-xs text-pixel-paper/70 line-clamp-2 min-h-[2rem]">
         {item.description}

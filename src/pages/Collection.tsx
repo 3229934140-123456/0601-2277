@@ -12,7 +12,11 @@ import { CHARACTERS } from '@/data/characters';
 import { rarityColors } from '@/data/bikes';
 import { paperRarityColors } from '@/data/papers';
 import { characterRarityColors } from '@/data/characters';
-import { ArrowLeft, Bike, Newspaper, User, X, Award, Star, Lock } from 'lucide-react';
+import {
+  ArrowLeft, Bike, Newspaper, User, X, Award, Star, Lock, Trophy, Target, Shield, Zap, Flame,
+} from 'lucide-react';
+import clsx from 'clsx';
+import { CharacterProgress, getCharacterTitle, getNextTitle, characterTitles } from '@/utils/storage';
 
 type Tab = 'bike' | 'paper' | 'character';
 
@@ -27,6 +31,7 @@ export default function Collection() {
   const selectedBike = useGameStore(s => s.saveData.selectedBike);
   const selectedPaper = useGameStore(s => s.saveData.selectedPaper);
   const selectedCharacter = useGameStore(s => s.saveData.selectedCharacter);
+  const characterProgress = useGameStore(s => s.saveData.characterProgress);
   const selectSkin = useGameStore(s => s.selectSkin);
   const totalCoins = useGameStore(s => s.saveData.totalCoins);
   const totalDeliveries = useGameStore(s => s.saveData.totalDeliveries);
@@ -81,12 +86,13 @@ export default function Collection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
           <MiniStat label="解锁自行车" value={`${unlockedBikes.length}/${BIKES.length}`} color="text-pixel-blue" />
           <MiniStat label="解锁报纸" value={`${unlockedPapers.length}/${PAPERS.length}`} color="text-pixel-paper" />
           <MiniStat label="解锁角色" value={`${unlockedCharacters.length}/${CHARACTERS.length}`} color="text-pink-300" />
           <MiniStat label="累计金币" value={totalCoins.toString()} color="text-pixel-gold" />
-          <MiniStat label="无伤通关" value={ps.noDamageCount.toString()} color="text-pixel-green" />
+          <MiniStat label="累计投递" value={totalDeliveries.toString()} color="text-pixel-green" />
+          <MiniStat label="无伤通关" value={ps.noDamageCount.toString()} color="text-pixel-cyan" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -120,6 +126,7 @@ export default function Collection() {
           {items.map(item => {
             const isUnlocked = unlocked.includes(item.id);
             const isSelected = selected === item.id;
+            const progress = tab === 'character' ? characterProgress[item.id] : undefined;
             return (
               <CollectionCard
                 key={item.id}
@@ -129,6 +136,7 @@ export default function Collection() {
                 selected={isSelected}
                 onClick={() => handleSelect(tab, item.id, isUnlocked)}
                 onPreview={() => handlePreview(tab, item, isUnlocked)}
+                characterProgress={progress}
               />
             );
           })}
@@ -150,6 +158,7 @@ export default function Collection() {
           item={previewItem.item}
           unlocked={previewItem.unlocked}
           selected={selected === previewItem.item.id}
+          progress={previewItem.type === 'character' ? characterProgress[previewItem.item.id] : undefined}
           onClose={() => setPreviewItem(null)}
           onSelect={() => {
             handleSelect(previewItem.type, previewItem.item.id, previewItem.unlocked);
@@ -172,12 +181,13 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
 }
 
 function PreviewModal({
-  type, item, unlocked, selected, onClose, onSelect,
+  type, item, unlocked, selected, progress, onClose, onSelect,
 }: {
   type: Tab;
   item: AnySkin;
   unlocked: boolean;
   selected: boolean;
+  progress?: CharacterProgress;
   onClose: () => void;
   onSelect: () => void;
 }) {
@@ -191,23 +201,26 @@ function PreviewModal({
   const headline = (item as any).headline || '';
   const backstory = (item as any).backstory || '';
 
+  const titleInfo = progress ? getCharacterTitle(progress) : null;
+  const nextTitle = progress ? getNextTitle(progress) : null;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 animate-fadeIn"
       onClick={onClose}>
       <div
-        className="pixel-border bg-pixel-brown max-w-lg w-full p-6 relative animate-pixel-pop"
+        className="pixel-border bg-pixel-brown max-w-2xl w-full p-6 relative animate-pixel-pop max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
         style={{ borderColor: rarity.border }}
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-pixel-red text-white pixel-border-sm hover:brightness-110"
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-pixel-red text-white pixel-border-sm hover:brightness-110 z-10"
         >
           <X className="w-4 h-4" strokeWidth={3} />
         </button>
 
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="w-full md:w-1/2">
+          <div className="w-full md:w-1/2 shrink-0">
             <div
               className="aspect-square bg-pixel-bg pixel-border-sm p-4 flex items-center justify-center relative"
               style={{ borderColor: rarity.bg }}
@@ -232,6 +245,33 @@ function PreviewModal({
                 </div>
               )}
             </div>
+
+            {type === 'character' && progress && unlocked && (
+              <div className="mt-4 pixel-border-sm bg-pixel-bg p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-pixel text-[9px] text-pixel-gold flex items-center gap-1">
+                    <Trophy className="w-3 h-3" /> 当前称号
+                  </span>
+                  <span className="font-pixel text-[10px] text-pixel-yellow">{titleInfo?.title}</span>
+                </div>
+                {nextTitle ? (
+                  <>
+                    <div className="h-2 bg-pixel-brown border-2 border-pixel-yellow/30 relative overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-pixel-yellow to-pixel-green"
+                        style={{ width: `${Math.min(100, (progress.playCount / nextTitle.threshold) * 100)}%` }} />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between font-retro text-[10px] text-pixel-paper/70">
+                      <span>{progress.playCount} 出战</span>
+                      <span className="text-pixel-gold">距【{nextTitle.title}】还需 {nextTitle.need} 场</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center font-pixel text-[9px] text-pixel-green">
+                    ✨ 已达到最高称号！
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-4 space-y-2">
               <div
@@ -286,6 +326,49 @@ function PreviewModal({
                 </div>
               )}
 
+              {type === 'character' && progress && unlocked && (
+                <div>
+                  <div className="font-pixel text-[10px] text-pink-300 mb-2 flex items-center gap-1">
+                    <Flame className="w-3 h-3" /> 角色成长数据
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <GrowthCell icon={<Zap className="w-3 h-3 text-pixel-yellow" />} label="出战次数" value={`${progress.playCount} 场`} />
+                    <GrowthCell icon={<Target className="w-3 h-3 text-pixel-green" />} label="累计投递" value={`${progress.totalDeliveries} 份`} />
+                    <GrowthCell icon={<Shield className="w-3 h-3 text-pixel-cyan" />} label="无伤通关" value={`${progress.noDamageRuns} 次`} />
+                    <GrowthCell icon={<Star className="w-3 h-3 text-pixel-gold" />} label="三星次数" value={`${progress.threeStars} 次`} />
+                  </div>
+                  <div className="mt-2 pixel-border-sm bg-pixel-bg p-2.5">
+                    <div className="font-pixel text-[9px] text-pixel-gold mb-1 flex items-center justify-between">
+                      <span>🏅 称号阶梯</span>
+                      <span className="text-pixel-paper/50">出战次数</span>
+                    </div>
+                    <div className="space-y-1">
+                      {characterTitles.map((t, i) => {
+                        const achieved = progress.playCount >= t.threshold;
+                        const isCurrent = titleInfo?.index === i;
+                        return (
+                          <div key={i} className={clsx(
+                            'flex items-center justify-between font-retro text-[11px] py-0.5 px-1.5',
+                            isCurrent ? 'bg-pixel-yellow/20 text-pixel-yellow font-pixel' : achieved ? 'text-pixel-green' : 'text-pixel-paper/30'
+                          )}>
+                            <span>
+                              {achieved ? '✓' : '·'} {t.title}
+                              {isCurrent && <span className="ml-1 text-[9px] text-pixel-yellow">（当前）</span>}
+                            </span>
+                            <span>{t.threshold}+ 场</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {titleInfo && (
+                    <div className="mt-2 text-xs italic text-pixel-paper/70">
+                      【{titleInfo.title}】：{titleInfo.desc}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {!unlocked && (
                 <div>
                   <div className="font-pixel text-[10px] text-pixel-red mb-1 flex items-center gap-1">
@@ -310,18 +393,21 @@ function PreviewModal({
                 ))}
               </div>
             </div>
-
-            {type === 'bike' && (
-              <div className="mt-3 pt-3 border-t-2 border-pixel-brownLight">
-                <PixelStars stars={3} size="sm" />
-                <div className="font-pixel text-[8px] text-pixel-paper/40 mt-1">
-                  集齐全部自行车可解锁隐藏奖励
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GrowthCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="pixel-border-sm bg-pixel-brown p-2">
+      <div className="flex items-center gap-1 mb-0.5">
+        {icon}
+        <span className="font-pixel text-[8px] text-pixel-paper/60">{label}</span>
+      </div>
+      <div className="font-pixel text-xs text-pixel-paper tabular-nums">{value}</div>
     </div>
   );
 }

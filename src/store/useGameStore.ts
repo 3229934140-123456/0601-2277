@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { loadSaveData, saveSaveData, defaultSaveData, SaveData, GameSettings, PersistentStats, LevelHistory } from '@/utils/storage';
+import {
+  loadSaveData, saveSaveData, defaultSaveData, SaveData, GameSettings, PersistentStats,
+  LevelHistoryEntry, CharacterProgress, makeCharacterProgress,
+} from '@/utils/storage';
 import { LEVELS, getLevelById, Level, LevelResult } from '@/data/levels';
 import { BIKES } from '@/data/bikes';
 import { PAPERS } from '@/data/papers';
@@ -48,7 +51,12 @@ interface GameState {
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
-  saveData: { ...defaultSaveData, persistentStats: { ...defaultSaveData.persistentStats }, levelHistory: {} },
+  saveData: {
+    ...defaultSaveData,
+    persistentStats: { ...defaultSaveData.persistentStats },
+    levelHistory: {},
+    characterProgress: { ...defaultSaveData.characterProgress },
+  },
   currentLevel: null,
   score: 0,
   combo: 0,
@@ -203,24 +211,46 @@ export const useGameStore = create<GameState>((set, get) => ({
     const prevStars = s.saveData.starProgress[level.id] || 0;
     const prevHigh = s.saveData.highScores[level.id] || 0;
 
+    const entry: LevelHistoryEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: Date.now(),
+      score: s.score,
+      stars,
+      victory,
+      character: s.saveData.selectedCharacter,
+      bike: s.saveData.selectedBike,
+      paper: s.saveData.selectedPaper,
+      deliveries: s.deliveries,
+      targetDeliveries: s.currentLevel.targetDeliveries,
+      coinsCollected: s.coinsCollected,
+      totalCoins: s.totalCoins,
+      comboMax: s.comboMax,
+      damageTaken: s.damageTaken,
+      timeLeft: s.timeLeft,
+      timeLimit: s.currentLevel.timeLimit,
+      livesUsed: result.livesUsed,
+      papersMissed: s.papersMissed,
+    };
+
+    const prevHistory = s.saveData.levelHistory[level.id] || [];
+    const newHistory = [entry, ...prevHistory].slice(0, 30);
+
     const ps: PersistentStats = { ...s.saveData.persistentStats };
     ps.deliveriesCount += s.deliveries;
     ps.comboMax = Math.max(ps.comboMax, s.comboMax);
     if (s.noDamageRun && victory) ps.noDamageCount += 1;
     if (stars === 3) ps.threeStars += 1;
 
-    const history: LevelHistory = {
-      score: Math.max(prevHigh, s.score),
-      stars: Math.max(prevStars, stars) as 0 | 1 | 2 | 3,
-      character: s.saveData.selectedCharacter,
-      bike: s.saveData.selectedBike,
-      paper: s.saveData.selectedPaper,
-      deliveries: s.deliveries,
-      coinsCollected: s.coinsCollected,
-      comboMax: s.comboMax,
-      damageTaken: s.damageTaken,
-      timeLeft: s.timeLeft,
-    };
+    const characterId = s.saveData.selectedCharacter;
+    const cp: Record<string, CharacterProgress> = { ...s.saveData.characterProgress };
+    if (!cp[characterId]) cp[characterId] = makeCharacterProgress(characterId);
+    const cur = { ...cp[characterId] };
+    cur.playCount += 1;
+    cur.totalDeliveries += s.deliveries;
+    cur.totalScore += s.score;
+    if (s.noDamageRun && victory) cur.noDamageRuns += 1;
+    if (stars === 3) cur.threeStars += 1;
+    cp[characterId] = cur;
 
     const newSave: SaveData = {
       ...s.saveData,
@@ -229,7 +259,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       totalCoins: s.saveData.totalCoins + s.coinsCollected,
       totalDeliveries: s.saveData.totalDeliveries + s.deliveries,
       persistentStats: ps,
-      levelHistory: { ...s.saveData.levelHistory, [level.id]: history },
+      levelHistory: { ...s.saveData.levelHistory, [level.id]: newHistory },
+      characterProgress: cp,
     };
     set({ saveData: newSave });
     saveSaveData(newSave);
@@ -256,7 +287,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     else key = 'unlockedCharacters';
     const list = s.saveData[key];
     if (list.includes(id)) return { newlyUnlocked: [] };
-    const newSave = { ...s.saveData, [key]: [...list, id] };
+    const cp = { ...s.saveData.characterProgress };
+    if (type === 'character' && !cp[id]) cp[id] = makeCharacterProgress(id);
+    const newSave = { ...s.saveData, [key]: [...list, id], characterProgress: cp };
     set({ saveData: newSave });
     saveSaveData(newSave);
     return { newlyUnlocked: [id] };

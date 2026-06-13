@@ -2,11 +2,12 @@ import clsx from 'clsx';
 
 interface Props {
   stars: 0 | 1 | 2 | 3;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   animate?: boolean;
 }
 
 const SIZE_MAP = {
+  xs: 'w-4 h-4',
   sm: 'w-6 h-6',
   md: 'w-10 h-10',
   lg: 'w-14 h-14',

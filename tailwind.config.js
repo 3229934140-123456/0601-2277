@@ -24,6 +24,7 @@ export default {
           gold: '#FFD700',
           silver: '#C0C0C0',
           bronze: '#CD7F32',
+          cyan: '#00E5FF',
         }
       },
       fontFamily: {
