@@ -9,7 +9,8 @@ import { getLevelById, LevelResult } from '@/data/levels';
 import { BIKES, getBikeById } from '@/data/bikes';
 import { PAPERS, getPaperById } from '@/data/papers';
 import { getCharacterById } from '@/data/characters';
-import { ArrowLeft, RotateCcw, Home, Award, Check, X } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Home, Award, Check, X, Sparkles, AlertTriangle, Target, Zap } from 'lucide-react';
+import { computeHighlights } from '@/utils/highlights';
 
 interface LocState {
   victory?: boolean;
@@ -84,6 +85,13 @@ export default function ResultScreen() {
     );
   }
 
+  const currentResult: LevelResult = {
+    score, deliveries, targetDeliveries: target, comboMax,
+    coinsCollected, totalCoins, timeLeft, timeLimit,
+    damageTaken, livesUsed, startLives: level.startLives, papersMissed,
+  };
+  const highlights = computeHighlights(currentResult, level);
+
   const conditions = [
     { key: '1', label: level.starConditions.one.desc, got: stars >= 1, color: '#CD7F32' },
     { key: '2', label: level.starConditions.two.desc, got: stars >= 2, color: '#C0C0C0' },
@@ -157,6 +165,45 @@ export default function ResultScreen() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="pixel-border-sm bg-gradient-to-br from-pixel-yellow/10 to-pixel-cyan/10 p-4 mb-6 border-pixel-yellow/40">
+            <div className="font-pixel text-xs text-pixel-yellow mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> 本局亮点 &amp; 下一把建议
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="pixel-border-sm bg-pixel-bg p-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap className="w-3 h-3 text-pixel-yellow" />
+                  <span className="font-pixel text-[9px] text-pixel-yellow">最佳表现</span>
+                </div>
+                <div className="font-retro text-sm text-pixel-paper">{highlights.bestStat}</div>
+                <div className="font-pixel text-xs text-pixel-green mt-0.5">{highlights.bestStatValue}</div>
+              </div>
+              <div className="pixel-border-sm bg-pixel-bg p-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Target className="w-3 h-3 text-pixel-cyan" />
+                  <span className="font-pixel text-[9px] text-pixel-cyan">最接近目标</span>
+                </div>
+                <div className="font-retro text-sm text-pixel-paper">{highlights.closestTarget}</div>
+              </div>
+            </div>
+            {highlights.almostStar && (
+              <div className="pixel-border-sm bg-pixel-red/10 p-2.5 mb-3 border-pixel-red/40">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className="w-3 h-3 text-pixel-red" />
+                  <span className="font-pixel text-[9px] text-pixel-red">差一点就拿到{highlights.almostStar.star}星！</span>
+                </div>
+                <div className="font-retro text-sm text-pixel-paper/90">{highlights.almostStar.reason}</div>
+              </div>
+            )}
+            <div className="pixel-border-sm bg-pixel-green/10 p-2.5 border-pixel-green/40">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Sparkles className="w-3 h-3 text-pixel-green" />
+                <span className="font-pixel text-[9px] text-pixel-green">下一把优先目标</span>
+              </div>
+              <div className="font-retro text-sm text-pixel-paper">{highlights.nextTip}</div>
             </div>
           </div>
 

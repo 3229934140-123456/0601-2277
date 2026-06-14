@@ -10,14 +10,21 @@ import { getBikeById } from '@/data/bikes';
 import { getPaperById } from '@/data/papers';
 import { getCharacterById } from '@/data/characters';
 import { LevelHistoryEntry } from '@/utils/storage';
+import { computeHighlights } from '@/utils/highlights';
 import { getStarOneGap, getStarTwoGap, getStarThreeGap } from '@/utils/gap';
 import {
   ArrowLeft, Lock, Trophy, Clock, Target, Shield, Coins, ChevronDown, ChevronUp, Check,
-  Zap, Calendar, Crown, Flame,
+  Zap, Calendar, Crown, Flame, ChevronLeft, ChevronRight, BookOpen, Sparkles, AlertTriangle,
 } from 'lucide-react';
 import clsx from 'clsx';
 
-type ViewMode = 'best' | 'star' | 'recent';
+type ViewMode = 'best' | 'star' | 'recent' | 'all';
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 export default function LevelSelect() {
   const navigate = useNavigate();
@@ -27,6 +34,7 @@ export default function LevelSelect() {
   const levelHistory = useGameStore(s => s.saveData.levelHistory);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('best');
+  const [pageIndex, setPageIndex] = useState(0);
 
   const handleStart = (level: Level) => {
     if (!isLevelUnlocked(level.id, starProgress)) return;
@@ -37,7 +45,7 @@ export default function LevelSelect() {
 
   const toggleExpand = (levelId: string) => {
     setExpandedLevel(prev => prev === levelId ? null : levelId);
-    if (expandedLevel !== levelId) setViewMode('best');
+    if (expandedLevel !== levelId) { setViewMode('best'); setPageIndex(0); }
   };
 
   return (
@@ -67,8 +75,13 @@ export default function LevelSelect() {
             const starEntry = useMemo(() => [...history].sort((a, b) => b.stars - a.stars || b.score - a.score)[0], [history]);
             const recentEntry = useMemo(() => history[0], [history]);
 
-            const displayEntry: LevelHistoryEntry | undefined =
-              viewMode === 'best' ? bestEntry : viewMode === 'star' ? starEntry : recentEntry;
+            let displayEntry: LevelHistoryEntry | undefined;
+            if (viewMode === 'best') displayEntry = bestEntry;
+            else if (viewMode === 'star') displayEntry = starEntry;
+            else if (viewMode === 'recent') displayEntry = recentEntry;
+            else displayEntry = history[pageIndex];
+
+            const maxPage = Math.max(0, history.length - 1);
 
             return (
               <div key={level.id} className={clsx('pixel-border transition-all', unlocked ? 'bg-pixel-brown' : 'bg-pixel-brown/60')}>
@@ -121,11 +134,29 @@ export default function LevelSelect() {
                 {expanded && unlocked && (
                   <div className="border-t-4 border-pixel-yellow/20 p-4 md:p-5 bg-pixel-brown/80">
                     <div className="flex flex-wrap items-center gap-2 mb-4">
-                      <ViewTab mode="best" active={viewMode === 'best'} onClick={() => setViewMode('best')} label="最高分" icon={<Crown className="w-3 h-3" />} />
-                      <ViewTab mode="star" active={viewMode === 'star'} onClick={() => setViewMode('star')} label="最佳星级" icon={<Trophy className="w-3 h-3" />} />
-                      <ViewTab mode="recent" active={viewMode === 'recent'} onClick={() => setViewMode('recent')} label="最近一次" icon={<Calendar className="w-3 h-3" />} />
-                      <div className="ml-auto font-pixel text-[8px] text-pixel-paper/40">
-                        共 {history.length} 次战绩
+                      <ViewTab mode="best" active={viewMode === 'best'} onClick={() => { setViewMode('best'); setPageIndex(0); }} label="最高分" icon={<Crown className="w-3 h-3" />} />
+                      <ViewTab mode="star" active={viewMode === 'star'} onClick={() => { setViewMode('star'); setPageIndex(0); }} label="最佳星级" icon={<Trophy className="w-3 h-3" />} />
+                      <ViewTab mode="recent" active={viewMode === 'recent'} onClick={() => { setViewMode('recent'); setPageIndex(0); }} label="最近一次" icon={<Calendar className="w-3 h-3" />} />
+                      <ViewTab mode="all" active={viewMode === 'all'} onClick={() => { setViewMode('all'); setPageIndex(0); }} label="全部战绩" icon={<BookOpen className="w-3 h-3" />} disabled={history.length === 0} />
+                      <div className="ml-auto flex items-center gap-2">
+                        {viewMode === 'all' && history.length > 1 && (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setPageIndex(p => Math.max(0, p - 1))} disabled={pageIndex === 0}
+                              className="pixel-btn pixel-btn-outline px-2 py-1 disabled:opacity-30">
+                              <ChevronLeft className="w-3 h-3" />
+                            </button>
+                            <span className="font-pixel text-[10px] text-pixel-paper/70 w-14 text-center">
+                              {history.length > 0 ? `${pageIndex + 1}/${history.length}` : '0/0'}
+                            </span>
+                            <button onClick={() => setPageIndex(p => Math.min(maxPage, p + 1))} disabled={pageIndex >= maxPage}
+                              className="pixel-btn pixel-btn-outline px-2 py-1 disabled:opacity-30">
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        <span className="font-pixel text-[8px] text-pixel-paper/40">
+                          共 {history.length} 次战绩
+                        </span>
                       </div>
                     </div>
 
@@ -139,12 +170,19 @@ export default function LevelSelect() {
                           <StarProgressBlock color="#C0C0C0" text={level.starConditions.two.desc} level={level} entry={displayEntry} gapFn={getStarTwoGap} star={2} />
                           <StarProgressBlock color="#FFD700" text={level.starConditions.three.desc} level={level} entry={displayEntry} gapFn={getStarThreeGap} star={3} />
                         </div>
+
+                        {displayEntry && viewMode === 'all' && (
+                          <div className="mt-3 pixel-border-sm bg-pixel-bg p-2 text-center">
+                            <span className="font-pixel text-[9px] text-pixel-paper/60">对战时间</span>
+                            <span className="font-pixel text-[10px] text-pixel-yellow ml-2 tabular-nums">{formatTime(displayEntry.timestamp)}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div>
                         <div className="font-pixel text-[10px] text-pixel-yellow mb-3">
                           {displayEntry
-                            ? `${viewMode === 'best' ? '最高分' : viewMode === 'star' ? '最佳星级' : '最近一次'}战绩`
+                            ? `${viewMode === 'best' ? '最高分' : viewMode === 'star' ? '最佳星级' : viewMode === 'recent' ? '最近一次' : `第 ${pageIndex + 1} 局`}战绩`
                             : '历史记录'}
                         </div>
                         {displayEntry ? (
@@ -161,6 +199,7 @@ export default function LevelSelect() {
                               accent={displayEntry.damageTaken === 0}
                             />
                             <BestRow icon={<Clock className="w-3 h-3 text-pixel-blue" />} label="余时" value={`${Math.ceil(displayEntry.timeLeft)}s`} />
+                            <BestRow icon={<Zap className="w-3 h-3 text-pixel-red" />} label="失误" value={`${displayEntry.papersMissed}份报纸`} accent={displayEntry.papersMissed > 0 ? 'red' : undefined} />
                             <div className="border-t-2 border-pixel-yellow/20 pt-1.5 mt-1.5">
                               <div className="font-pixel text-[8px] text-pixel-paper/50 mb-1">使用配置</div>
                               <div className="flex flex-wrap gap-2">
@@ -169,6 +208,60 @@ export default function LevelSelect() {
                                 <ConfigTag label="报纸" name={getPaperById(displayEntry.paper)?.name || '-'} />
                               </div>
                             </div>
+
+                            {(viewMode === 'all' || viewMode === 'recent') && (() => {
+                              const r: LevelResult = {
+                                score: displayEntry.score,
+                                deliveries: displayEntry.deliveries,
+                                targetDeliveries: displayEntry.targetDeliveries,
+                                comboMax: displayEntry.comboMax,
+                                coinsCollected: displayEntry.coinsCollected,
+                                totalCoins: displayEntry.totalCoins,
+                                timeLeft: displayEntry.timeLeft,
+                                timeLimit: displayEntry.timeLimit,
+                                damageTaken: displayEntry.damageTaken,
+                                livesUsed: displayEntry.livesUsed,
+                                startLives: 3,
+                                papersMissed: displayEntry.papersMissed,
+                              };
+                              const h = computeHighlights(r, level);
+                              return (
+                                <div className="border-t-2 border-pixel-yellow/20 pt-2 mt-2">
+                                  <div className="font-pixel text-[9px] text-pixel-gold mb-1.5 flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> 本局亮点 & 下一把建议
+                                  </div>
+                                  <div className="space-y-1 font-retro text-xs">
+                                    <div className="flex items-start gap-1.5">
+                                      <Trophy className="w-3 h-3 text-pixel-yellow mt-0.5 shrink-0" />
+                                      <div>
+                                        <span className="text-pixel-gold font-pixel text-[8px]">最佳表现：</span>
+                                        <span className="text-pixel-paper">{h.bestStat} - {h.bestStatValue}</span>
+                                      </div>
+                                    </div>
+                                    {h.almostStar && (
+                                      <div className="flex items-start gap-1.5">
+                                        <AlertTriangle className="w-3 h-3 text-pixel-yellow mt-0.5 shrink-0" />
+                                        <div>
+                                          <span className="text-pixel-yellow font-pixel text-[8px]">最接近的 {h.almostStar.label}：</span>
+                                          <span className="text-pixel-paper/80">{h.almostStar.reason}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div className="flex items-start gap-1.5">
+                                      <Zap className="w-3 h-3 text-pixel-blue mt-0.5 shrink-0" />
+                                      <div>
+                                        <span className="text-pixel-blue font-pixel text-[8px]">最接近目标：</span>
+                                        <span className="text-pixel-paper">{h.closestTarget}</span>
+                                      </div>
+                                    </div>
+                                    <div className="pixel-border-sm bg-pixel-yellow/10 p-1.5 mt-1.5">
+                                      <span className="text-pixel-yellow font-pixel text-[8px]">下一把建议：</span>
+                                      <span className="text-pixel-paper/90 font-retro text-xs ml-1">{h.nextTip}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <div className="font-retro text-sm text-pixel-paper/50 italic space-y-2">
@@ -176,6 +269,12 @@ export default function LevelSelect() {
                             <BestRow icon={<Target className="w-3 h-3 text-pixel-green" />} label="目标" value={`${level.targetDeliveries}份投递`} />
                             <BestRow icon={<Clock className="w-3 h-3 text-pixel-blue" />} label="限时" value={`${level.timeLimit}s`} />
                             <BestRow icon={<Zap className="w-3 h-3 text-pixel-yellow" />} label="金币" value={`${level.pickups.filter(p => p.type === 'coin').length}枚`} />
+                            <div className="pixel-border-sm bg-pixel-bg p-2 mt-2">
+                              <div className="font-pixel text-[9px] text-pixel-yellow mb-1">首次通关小提示</div>
+                              <div className="font-retro text-xs text-pixel-paper/70">
+                                先熟悉街区路线，空格蓄力投进邮箱/门口，躲避水坑与小狗！
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -198,13 +297,17 @@ export default function LevelSelect() {
   );
 }
 
-function ViewTab({ mode, active, onClick, label, icon }: { mode: ViewMode; active: boolean; onClick: () => void; label: string; icon: React.ReactNode }) {
+function ViewTab({ mode, active, onClick, label, icon, disabled }: {
+  mode: ViewMode; active: boolean; onClick: () => void; label: string; icon: React.ReactNode; disabled?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={clsx(
         'pixel-btn flex items-center gap-1 font-pixel text-[10px] px-3 py-1.5 transition-all',
-        active ? 'pixel-btn-yellow' : 'pixel-btn-outline opacity-60 hover:opacity-100'
+        active ? 'pixel-btn-yellow' : 'pixel-btn-outline opacity-60 hover:opacity-100',
+        disabled && 'opacity-30 cursor-not-allowed'
       )}
     >
       {icon}
@@ -222,7 +325,7 @@ function StarProgressBlock({ color, text, level, entry, gapFn, star }: {
   const prevStars = (useGameStore.getState().saveData.starProgress[level.id] || 0);
   const starDone = prevStars >= star;
 
-  let gapResult: { done: boolean; gaps: string[] } = { done: starDone, gaps: starDone ? ['已达成'] : ['未通关过，来一局看看吧'] };
+  let gapResult: { done: boolean; gaps: string[] } = { done: starDone, gaps: starDone ? ['已达成历史最高星级'] : ['未通关过，来一局看看吧'] };
   if (entry) {
     const r: LevelResult = {
       score: entry.score,
@@ -268,12 +371,13 @@ function StarProgressBlock({ color, text, level, entry, gapFn, star }: {
   );
 }
 
-function BestRow({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
+function BestRow({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: 'green' | 'red' | boolean }) {
+  const color = accent === 'red' ? 'text-pixel-red' : accent === true || accent === 'green' ? 'text-pixel-green font-pixel text-xs' : 'text-pixel-paper';
   return (
     <div className="flex items-center gap-2">
       {icon}
       <span className="text-pixel-paper/60 w-12 shrink-0">{label}</span>
-      <span className={accent ? 'text-pixel-green font-pixel text-xs' : 'text-pixel-paper'}>{value}</span>
+      <span className={color}>{value}</span>
     </div>
   );
 }

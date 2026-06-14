@@ -13,10 +13,11 @@ import { rarityColors } from '@/data/bikes';
 import { paperRarityColors } from '@/data/papers';
 import { characterRarityColors } from '@/data/characters';
 import {
-  ArrowLeft, Bike, Newspaper, User, X, Award, Star, Lock, Trophy, Target, Shield, Zap, Flame,
+  ArrowLeft, Bike, Newspaper, User, X, Award, Star, Lock, Trophy, Target, Shield, Zap, Flame, ChevronRight, BookOpen,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { CharacterProgress, getCharacterTitle, getNextTitle, characterTitles } from '@/utils/storage';
+import { CharacterProgress } from '@/utils/storage';
+import { CharacterSkin, CharacterStage, getCharacterStage, getNextCharacterStage } from '@/data/characters';
 
 type Tab = 'bike' | 'paper' | 'character';
 
@@ -201,8 +202,9 @@ function PreviewModal({
   const headline = (item as any).headline || '';
   const backstory = (item as any).backstory || '';
 
-  const titleInfo = progress ? getCharacterTitle(progress) : null;
-  const nextTitle = progress ? getNextTitle(progress) : null;
+  const character = type === 'character' ? (item as CharacterSkin) : null;
+  const stageInfo = progress && character ? getCharacterStage(character, progress.playCount) : null;
+  const nextStageInfo = progress && character ? getNextCharacterStage(character, progress.playCount) : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 animate-fadeIn"
@@ -246,23 +248,30 @@ function PreviewModal({
               )}
             </div>
 
-            {type === 'character' && progress && unlocked && (
+            {type === 'character' && progress && unlocked && character && (
               <div className="mt-4 pixel-border-sm bg-pixel-bg p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="font-pixel text-[9px] text-pixel-gold flex items-center gap-1">
                     <Trophy className="w-3 h-3" /> 当前称号
                   </span>
-                  <span className="font-pixel text-[10px] text-pixel-yellow">{titleInfo?.title}</span>
+                  <span className="font-pixel text-[10px] text-pixel-yellow">{stageInfo?.stage.title}</span>
                 </div>
-                {nextTitle ? (
+                {stageInfo && (
+                  <div className="pixel-border-sm bg-pixel-brown/40 p-2 mb-2">
+                    <div className="font-retro text-[11px] text-pixel-paper/90 italic leading-relaxed">
+                      "{stageInfo.stage.story}"
+                    </div>
+                  </div>
+                )}
+                {nextStageInfo ? (
                   <>
                     <div className="h-2 bg-pixel-brown border-2 border-pixel-yellow/30 relative overflow-hidden">
                       <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-pixel-yellow to-pixel-green"
-                        style={{ width: `${Math.min(100, (progress.playCount / nextTitle.threshold) * 100)}%` }} />
+                        style={{ width: `${Math.min(100, (progress.playCount / nextStageInfo.stage.threshold) * 100)}%` }} />
                     </div>
                     <div className="mt-1 flex items-center justify-between font-retro text-[10px] text-pixel-paper/70">
                       <span>{progress.playCount} 出战</span>
-                      <span className="text-pixel-gold">距【{nextTitle.title}】还需 {nextTitle.need} 场</span>
+                      <span className="text-pixel-gold">距【{nextStageInfo.stage.title}】还需 {nextStageInfo.need} 场</span>
                     </div>
                   </>
                 ) : (
@@ -326,46 +335,57 @@ function PreviewModal({
                 </div>
               )}
 
-              {type === 'character' && progress && unlocked && (
+              {type === 'character' && progress && unlocked && character && (
                 <div>
                   <div className="font-pixel text-[10px] text-pink-300 mb-2 flex items-center gap-1">
                     <Flame className="w-3 h-3" /> 角色成长数据
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     <GrowthCell icon={<Zap className="w-3 h-3 text-pixel-yellow" />} label="出战次数" value={`${progress.playCount} 场`} />
                     <GrowthCell icon={<Target className="w-3 h-3 text-pixel-green" />} label="累计投递" value={`${progress.totalDeliveries} 份`} />
                     <GrowthCell icon={<Shield className="w-3 h-3 text-pixel-cyan" />} label="无伤通关" value={`${progress.noDamageRuns} 次`} />
                     <GrowthCell icon={<Star className="w-3 h-3 text-pixel-gold" />} label="三星次数" value={`${progress.threeStars} 次`} />
                   </div>
-                  <div className="mt-2 pixel-border-sm bg-pixel-bg p-2.5">
-                    <div className="font-pixel text-[9px] text-pixel-gold mb-1 flex items-center justify-between">
-                      <span>🏅 称号阶梯</span>
-                      <span className="text-pixel-paper/50">出战次数</span>
+                  <div className="pixel-border-sm bg-pixel-bg p-2.5">
+                    <div className="font-pixel text-[9px] text-pixel-gold mb-2 flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" /> 🏅 角色成长档案
                     </div>
-                    <div className="space-y-1">
-                      {characterTitles.map((t, i) => {
-                        const achieved = progress.playCount >= t.threshold;
-                        const isCurrent = titleInfo?.index === i;
+                    <div className="space-y-1.5">
+                      {character.stages.map((s: CharacterStage, i: number) => {
+                        const achieved = progress.playCount >= s.threshold;
+                        const isCurrent = stageInfo?.index === i;
+                        const isNext = nextStageInfo && nextStageInfo.stage.threshold === s.threshold;
                         return (
                           <div key={i} className={clsx(
-                            'flex items-center justify-between font-retro text-[11px] py-0.5 px-1.5',
-                            isCurrent ? 'bg-pixel-yellow/20 text-pixel-yellow font-pixel' : achieved ? 'text-pixel-green' : 'text-pixel-paper/30'
+                            'pixel-border-sm p-2',
+                            isCurrent ? 'bg-pixel-yellow/15 border-pixel-yellow/50' : achieved ? 'bg-pixel-green/10 border-pixel-green/30' : isNext ? 'bg-pixel-cyan/10 border-pixel-cyan/30' : 'bg-pixel-brown/20 border-pixel-brown/30 opacity-60'
                           )}>
-                            <span>
-                              {achieved ? '✓' : '·'} {t.title}
-                              {isCurrent && <span className="ml-1 text-[9px] text-pixel-yellow">（当前）</span>}
-                            </span>
-                            <span>{t.threshold}+ 场</span>
+                            <div className="flex items-center justify-between font-pixel text-[10px] mb-1">
+                              <span className={clsx(
+                                isCurrent ? 'text-pixel-yellow' : achieved ? 'text-pixel-green' : isNext ? 'text-pixel-cyan' : 'text-pixel-paper/50'
+                              )}>
+                                {achieved ? '✓ ' : isNext ? '→ ' : '· '}{s.title}
+                                {isCurrent && <span className="ml-1 text-pixel-yellow">（当前）</span>}
+                                {isNext && !achieved && <span className="ml-1 text-pixel-cyan">（下一阶）</span>}
+                              </span>
+                              <span className={clsx(
+                                'text-[9px]',
+                                achieved ? 'text-pixel-green' : 'text-pixel-paper/40'
+                              )}>
+                                {s.threshold}+ 场
+                              </span>
+                            </div>
+                            <div className={clsx(
+                              'font-retro text-[10px] leading-relaxed italic',
+                              isCurrent ? 'text-pixel-paper' : achieved ? 'text-pixel-paper/80' : 'text-pixel-paper/40'
+                            )}>
+                              "{s.story}"
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                  {titleInfo && (
-                    <div className="mt-2 text-xs italic text-pixel-paper/70">
-                      【{titleInfo.title}】：{titleInfo.desc}
-                    </div>
-                  )}
                 </div>
               )}
 
